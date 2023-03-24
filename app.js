@@ -2,27 +2,34 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
-var _ = require('lodash');
+const _ = require('lodash');
+const mongoose = require('mongoose');
 
 
-//EJS, Body Parser and Express modules setup
+//EJS, Body Parser, Express and Mongoose modules setup
 const app = express();
 app.set('view engine', 'ejs');
-app.use(bodyParser.urlencoded({
-  extended: true
-}));
+app.use(bodyParser.urlencoded({extended: true}));
 app.use(express.static("public"));
+mongoose.connect('mongodb+srv://henry:test2-123@cluster0.pkmpe4c.mongodb.net/blogDB', {useNewUrlParser: true});
 
 
-//Empy variable to store posts
-let posts = [];
+//Set postsSchema
+const postsSchema = {
+  title: String,
+  content: String
+};
+const Post = mongoose.model('post', postsSchema);
 
 
 //Home, contact, compose, and posts routes
 app.get('/', function(req, res) {
-  res.render('home', {
-    posts: posts
-  });
+  //Finds all posts and renders them in the home route
+  Post.find({}).then(function(foundPosts){
+    res.render('home', {posts: foundPosts});
+  })
+
+
 });
 
 app.get('/contact', function(req, res) {
@@ -34,22 +41,16 @@ app.get('/compose', function(req, res) {
 });
 
 
-//Stores and lower-cases the typed URl title
 //Checks to see if typed post title exists, and redirects for specific post page
 //Passes the specific post's title and content to be loaded in EJS post page
-app.get('/posts/:postName', function(req, res) {
-  const requestedTitle = _.lowerCase(req.params.postName);
+app.get('/posts/:postName', async function(req, res) {
 
-  posts.forEach(function(post) {
-    const storedTitle = _.lowerCase(post.title);
-
-    if (storedTitle === requestedTitle) {
-      res.render('post', {
-        title: post.title,
-        content: post.content
-      });
-    }
-  });
+  const foundPost = await Post.findOne({title: req.params.postName});
+  if(!foundPost){
+    res.render('notfound');
+  }else{
+    res.render('post', {title: foundPost.title, content: foundPost.content});
+  }
 
 });
 
@@ -58,12 +59,12 @@ app.get('/posts/:postName', function(req, res) {
 //Redirects to home route already displaying the new note
 app.post('/compose', function(req, res) {
 
-  const post = {
+  const post = new Post ({
     title: req.body.postTitle,
     content: req.body.postBody
-  };
+  });
 
-  posts.push(post);
+  post.save();
   res.redirect('/');
 });
 
